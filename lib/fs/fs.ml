@@ -5,10 +5,12 @@ type tree =
       name : string;
       contents : Filec.t Lazy.t;
       file_type : Filec.file_type Lazy.t;
+      ignored : bool;
     }
   | Dir of {
       name : string;
       children : tree array Lazy.t;
+      ignored : bool;
     }
 
 type dir_cursor = {
@@ -38,39 +40,80 @@ let order_files t1 t2 =
 
 let rec sort_tree = function
   | File _ as f -> f
-  | Dir { name; children = (lazy children) } ->
+  | Dir { name; children = (lazy children); ignored } ->
       Array.sort order_files children;
-      Dir { name; children = lazy (Array.map sort_tree children) }
+      Dir { name; children = lazy (Array.map sort_tree children); ignored }
+
+let filter_visible ~show_ignored files =
+  if show_ignored then files
+  else
+    files
+    |> Array.to_list
+    |> List.filter (function
+         | File { ignored = true; _ } | Dir { ignored = true; _ } -> false
+         | _ -> true)
+    |> Array.of_list
+
+let relative_path ~root path =
+  let prefix =
+    if Filename.check_suffix root Filename.dir_sep then root
+    else root ^ Filename.dir_sep
+  in
+  if String.starts_with ~prefix path then
+    String.sub path (String.length prefix)
+      (String.length path - String.length prefix)
+  else path
 
 (* Recursively reads a directory tree *)
-let rec to_tree path =
+let rec to_tree ~patterns ~root path =
+  let name = Filename.basename path in
+  let rel_path =
+    let rel = relative_path ~root path in
+    if Sys.is_directory path then rel ^ Filename.dir_sep else rel
+  in
+  let ignored = Gitignore.is_ignored rel_path patterns in
   if Sys.is_directory path then
     let children =
       lazy
-        (Array.map
-           (fun child_name -> to_tree (Filename.concat path child_name))
-           (Sys.readdir path))
+        (Sys.readdir path
+        |> Array.to_list
+        |> List.map (Filename.concat path)
+        |> List.map (to_tree ~patterns ~root)
+        |> Array.of_list)
     in
-    let name = Filename.basename path in
-    Dir { name; children }
+    Dir { name; ignored; children }
   else
     File
       {
-        name = Filename.basename path;
+        name;
+        ignored;
         contents = lazy (Filec.read path);
         file_type = lazy (Filec.type_of_path path);
       }
 
-let read_tree path = path |> to_tree |> sort_tree
+let ignore_patterns path =
+  match Gitignore.find_gitignore path with
+  | Some content -> Gitignore.parse content
+  | None -> []
+
+let read_tree path =
+  to_tree ~patterns:(ignore_patterns path) ~root:path path |> sort_tree
+
 let file_at cursor = cursor.files.(cursor.pos)
 
 type zipper = {
   parents : dir_cursor list;
   current : cursor;
+  show_ignored : bool;
 }
 
-let zip_it trees =
-  { parents = []; current = Dir_cursor { pos = 0; files = trees } }
+let zip_it trees ~show_ignored =
+  let visible = filter_visible ~show_ignored trees in
+  {
+    parents = [];
+    current = Dir_cursor { pos = 0; files = visible };
+    show_ignored;
+  }
 
 let zipper_parents zipper =
   List.map (fun cursor -> file_name (file_at cursor)) zipper.parents
@@ -113,16 +156,24 @@ let go_next zipper =
           {
             parents = cursor :: zipper.parents;
             current = File_cursor (Lazy.force contents);
+            show_ignored = zipper.show_ignored;
           }
-      | Dir { children = (lazy next); _ } ->
-          if Array.length next = 0 then zipper
-          else
-            {
-              parents = cursor :: zipper.parents;
-              current = Dir_cursor { pos = 0; files = next };
-            })
+      | Dir { children = (lazy children); _ } ->
+          let visible =
+            filter_visible ~show_ignored:zipper.show_ignored children
+          in
+          {
+            parents = cursor :: zipper.parents;
+            current = Dir_cursor { pos = 0; files = visible };
+            show_ignored = zipper.show_ignored;
+          })
 
 let go_back zipper =
   match zipper.parents with
   | [] -> zipper
-  | current :: parents -> { parents; current = Dir_cursor current }
+  | current :: parents ->
+      {
+        parents;
+        current = Dir_cursor current;
+        show_ignored = zipper.show_ignored;
+      }

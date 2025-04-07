@@ -33,16 +33,19 @@ type initial_data = {
   files : Fs.tree array;
   width : int;
   height : int;
+  no_gitignore : bool;
 }
 
-let initial_model { owner; repo; root_dir_path; files; width; height } =
+let initial_model
+    { owner; repo; root_dir_path; no_gitignore; files; width; height } =
   {
     width;
     height;
     owner;
     repo;
     current_tab = Code;
-    code_tab = { root_dir_path; fs = Fs.zip_it files };
+    code_tab =
+      { root_dir_path; fs = Fs.zip_it ~show_ignored:no_gitignore files };
     issues_tab = Issue.make ~owner ~repo;
     pull_requests_tab = Pr.make ~owner ~repo;
   }

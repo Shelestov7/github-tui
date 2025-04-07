@@ -54,7 +54,7 @@ let fmt_file ~max_name_len (tree : Fs.tree) =
       match Lazy.force file_type with
       | Fs.Filec.Text -> Pretty.Icon.file_char ^ " " ^ pad name
       | Fs.Filec.Binary -> Pretty.Icon.bin_char ^ " " ^ pad name)
-  | Dir { name; children = (lazy children) } -> (
+  | Dir { name; children = (lazy children); _ } -> (
       match children with
       | [||] -> Pretty.Icon.empty_dir_char ^ " " ^ pad name
       | _ -> Pretty.Icon.dir_char ^ " " ^ pad name)

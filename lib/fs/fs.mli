@@ -11,10 +11,12 @@ type tree =
       name : string;
       contents : Filec.t Lazy.t;
       file_type : Filec.file_type Lazy.t;
+      ignored : bool;
     }
   | Dir of {
       name : string;
       children : tree array Lazy.t;
+      ignored : bool;
     }
 
 (** Return the name of a given tree node. *)
@@ -40,10 +42,11 @@ val file_at : dir_cursor -> tree
 type zipper = {
   parents : dir_cursor list;
   current : cursor;
+  show_ignored : bool;
 }
 
 (** Constructs a zipper from the contents of a given directory. *)
-val zip_it : tree array -> zipper
+val zip_it : tree array -> show_ignored:bool -> zipper
 
 (** Returns the list of parents names in reverse order. *)
 val zipper_parents : zipper -> string list

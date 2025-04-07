@@ -22,12 +22,22 @@ let ignore_size_warning_arg =
   let doc = "Ignore the minimum size warning." in
   Arg.(value & flag & info [ "i"; "ignore-size-warning" ] ~doc)
 
-let run owner_repo local_path log_file ignore_size_warning =
-  Tui.start { owner_repo; local_path; log_file; ignore_size_warning }
+let no_gitignore_arg =
+  let doc = "Show gitignored files in file tree." in
+  Arg.(value & flag & info [ "n"; "no-gitignore" ] ~doc)
+
+let run owner_repo local_path log_file ignore_size_warning no_gitignore =
+  Tui.start
+    { owner_repo; local_path; log_file; ignore_size_warning; no_gitignore }
 
 let gh_tui_term =
   Term.(
-    const run $ owner_repo_arg $ path_arg $ log_arg $ ignore_size_warning_arg)
+    const run
+    $ owner_repo_arg
+    $ path_arg
+    $ log_arg
+    $ ignore_size_warning_arg
+    $ no_gitignore_arg)
 
 let cmd =
   let doc = "TUI of a GitHub repository" in
