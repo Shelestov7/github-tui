@@ -47,6 +47,18 @@ let max_file_name_len files =
   |> Array.map (fun file -> file |> Fs.file_name |> Extra.String.width)
   |> Array.fold_left max 0
 
+let file_is_ignored (tree : Fs.tree) =
+  match tree with
+  | Fs.File { ignored; _ } | Fs.Dir { ignored; _ } -> ignored
+
+let filter_children ~show_ignored children =
+  if show_ignored then children
+  else
+    children
+    |> Array.to_list
+    |> List.filter (fun child -> not (file_is_ignored child))
+    |> Array.of_list
+
 let fmt_file ~max_name_len (tree : Fs.tree) =
   let pad = Extra.String.fill_right max_name_len in
   match tree with
@@ -88,6 +100,43 @@ let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen =
          if i = hi_pos - 1 || i = hi_pos || i = hi_pos + 1 then fmt style s
          else str s)
   |> vertical
+
+(* let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen =
+  let open Pretty.Doc in
+  let max_name_len = max_file_name_len cursor.files in
+  let max_len = max_name_len + file_name_padding in
+
+  (* Frame *)
+  let top = "╭" ^ Extra.String.repeat_txt (max_len - 2) "─" ^ "╮" in
+  let mid = "├" ^ Extra.String.repeat_txt (max_len - 2) "─" ^ "┤" in
+  let bot = "╰" ^ Extra.String.repeat_txt (max_len - 2) "─" ^ "╯" in
+
+  (* Line formatting *)
+  let fmt_selected_name file = "│ " ^ fmt_file ~max_name_len file ^ " ├" in
+  let fmt_name file = "│ " ^ fmt_file ~max_name_len file ^ " │" in
+  let is_ignored file = file_is_ignored file in
+
+  (* let hi_pos = (2 * cursor.pos) + 1 in *)
+
+  (* Combine *)
+  cursor.files
+  |> Array.to_list
+  |> List.mapi (fun i file ->
+         let line =
+           if i = cursor.pos && has_next then fmt_selected_name file
+           else fmt_name file
+         in
+         let base_style =
+           if is_file_chosen then Style.chosen
+           else if is_ignored file then Style.gitignored
+           else if i = cursor.pos then Style.selected
+           else Style.none
+         in
+         fmt base_style line)
+  |> Extra.List.in_between ~sep:(fmt Style.none mid)
+  |> fun lines ->
+  [ fmt Style.none top ] @ lines @ [ fmt Style.none bot ]
+  |> vertical *)
 
 let children_to_doc ~prev_total ~pos children =
   let open Pretty.Doc in
@@ -152,7 +201,7 @@ type selected_node =
   | Dir_selected of {
       prev_total : int;
       pos : int;
-      children : Fs.tree array Lazy.t;
+      children : Fs.tree array;
     }
 
 let next_level_to_doc selected_node =
@@ -161,7 +210,6 @@ let next_level_to_doc selected_node =
   | File_selected file_contents ->
       File_contents (file_contents_to_doc ~file_contents)
   | Dir_selected { children; prev_total; pos } -> (
-      let children = Lazy.force children in
       match children with
       (* No children of a directory without children *)
       | [||] -> Empty_directory
@@ -187,17 +235,23 @@ let fs_to_view (fs : Fs.zipper) =
         failwith
           "Error during rendering! Impossible to have a file without a parent"
     | File_cursor contents, parent :: _ -> (parent, File_selected contents)
-    | Dir_cursor cursor, _ -> (
-        match Fs.file_at cursor with
-        | File { contents; _ } -> (cursor, File_selected (Lazy.force contents))
-        | Dir { children; _ } ->
-            ( cursor,
-              Dir_selected
-                {
-                  children;
-                  prev_total = Array.length cursor.files;
-                  pos = cursor.pos;
-                } ))
+    | Dir_cursor cursor, _ ->
+        if Array.length cursor.files = 0 then
+          (cursor, Dir_selected { children = [||]; prev_total = 0; pos = 0 })
+        else
+          match Fs.file_at cursor with
+          | File { contents; _ } -> (cursor, File_selected (Lazy.force contents))
+          | Dir { children = (lazy children); _ } ->
+              let visible_children =
+                filter_children ~show_ignored:fs.show_ignored children
+              in
+              ( cursor,
+                Dir_selected
+                  {
+                    children = visible_children;
+                    prev_total = Array.length cursor.files;
+                    pos = cursor.pos;
+                  } )
   in
 
   { left; right; is_file_chosen }

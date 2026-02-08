@@ -28,7 +28,13 @@ let no_gitignore_arg =
 
 let run owner_repo local_path log_file ignore_size_warning no_gitignore =
   Tui.start
-    { owner_repo; local_path; log_file; ignore_size_warning; no_gitignore }
+    {
+      owner_repo;
+      local_path;
+      log_file;
+      ignore_size_warning;
+      show_gitignored = no_gitignore;
+    }
 
 let gh_tui_term =
   Term.(

@@ -3,7 +3,7 @@ type t = {
   local_path : string option;
   log_file : string option;
   ignore_size_warning : bool;
-  no_gitignore : bool;
+  show_gitignored : bool;
 }
 
 val init : t -> Model.initial_data

@@ -1,4 +1,5 @@
 module Filec = Filec
+module Gitignore = Gitignore
 
 type tree =
   | File of {
@@ -127,8 +128,10 @@ let move_cursor move_dir_cursor move_file_cursor = function
 
 let move_dir_cursor move cursor =
   let len = Array.length cursor.files in
-  let new_pos = (cursor.pos + move + len) mod len in
-  { cursor with pos = new_pos }
+  if len = 0 then cursor
+  else
+    let new_pos = (cursor.pos + move + len) mod len in
+    { cursor with pos = new_pos }
 
 let move_file_cursor move cursor =
   let len = Filec.length cursor in
@@ -149,24 +152,28 @@ let go_up = go_move (-1)
 let go_next zipper =
   match zipper.current with
   | File_cursor _ -> zipper
-  | Dir_cursor cursor -> (
-      let next = file_at cursor in
-      match next with
-      | File { contents; _ } ->
-          {
-            parents = cursor :: zipper.parents;
-            current = File_cursor (Lazy.force contents);
-            show_ignored = zipper.show_ignored;
-          }
-      | Dir { children = (lazy children); _ } ->
-          let visible =
-            filter_visible ~show_ignored:zipper.show_ignored children
-          in
-          {
-            parents = cursor :: zipper.parents;
-            current = Dir_cursor { pos = 0; files = visible };
-            show_ignored = zipper.show_ignored;
-          })
+  | Dir_cursor cursor ->
+      if Array.length cursor.files = 0 then zipper
+      else
+        let next = file_at cursor in
+        match next with
+        | File { contents; _ } ->
+            {
+              parents = cursor :: zipper.parents;
+              current = File_cursor (Lazy.force contents);
+              show_ignored = zipper.show_ignored;
+            }
+        | Dir { children = (lazy children); _ } ->
+            let visible =
+              filter_visible ~show_ignored:zipper.show_ignored children
+            in
+            if Array.length visible = 0 then zipper
+            else
+              {
+                parents = cursor :: zipper.parents;
+                current = Dir_cursor { pos = 0; files = visible };
+                show_ignored = zipper.show_ignored;
+              }
 
 let go_back zipper =
   match zipper.parents with

@@ -1,6 +1,7 @@
 (** Module for manipulating different file contents (text, binary) to get lines
     and current offsets. *)
 module Filec = Filec
+module Gitignore = Gitignore
 
 (* NOTE: contents and file_type are stored separately so we can know the file
     type and assign a proper icon without reading the contents *)

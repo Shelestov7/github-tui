@@ -5,6 +5,17 @@ type rule = {
   negated : bool;
 }
 
+let strip_prefix ~prefix text =
+  if String.starts_with ~prefix text then
+    String.sub text (String.length prefix)
+      (String.length text - String.length prefix)
+  else text
+
+let normalize_path path =
+  path
+  |> strip_prefix ~prefix:"./"
+  |> strip_prefix ~prefix:Filename.dir_sep
+
 let find_gitignore path =
   let full_path = Filename.concat path ".gitignore" in
   if Sys.file_exists full_path then (
@@ -29,10 +40,16 @@ let parse (content : string) : rule list =
          else { pattern = line; negated = false })
 
 let matches path rule =
-  try
-    let re = Re.Glob.glob ~anchored:true rule.pattern |> Re.compile in
-    Re.execp re path
-  with _ -> false
+  let normalized_path = normalize_path path in
+  let normalized_pattern = normalize_path rule.pattern in
+  if normalized_pattern = "" then false
+  else if String.ends_with ~suffix:Filename.dir_sep normalized_pattern then
+    String.starts_with ~prefix:normalized_pattern normalized_path
+  else
+    try
+      let re = Re.Glob.glob ~anchored:true normalized_pattern |> Re.compile in
+      Re.execp re normalized_path
+    with _ -> false
 
 let is_ignored path rules =
   let rec apply rules ignored =
