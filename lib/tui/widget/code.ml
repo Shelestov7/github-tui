@@ -101,43 +101,6 @@ let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen =
          else str s)
   |> vertical
 
-(* let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen =
-  let open Pretty.Doc in
-  let max_name_len = max_file_name_len cursor.files in
-  let max_len = max_name_len + file_name_padding in
-
-  (* Frame *)
-  let top = "╭" ^ Extra.String.repeat_txt (max_len - 2) "─" ^ "╮" in
-  let mid = "├" ^ Extra.String.repeat_txt (max_len - 2) "─" ^ "┤" in
-  let bot = "╰" ^ Extra.String.repeat_txt (max_len - 2) "─" ^ "╯" in
-
-  (* Line formatting *)
-  let fmt_selected_name file = "│ " ^ fmt_file ~max_name_len file ^ " ├" in
-  let fmt_name file = "│ " ^ fmt_file ~max_name_len file ^ " │" in
-  let is_ignored file = file_is_ignored file in
-
-  (* let hi_pos = (2 * cursor.pos) + 1 in *)
-
-  (* Combine *)
-  cursor.files
-  |> Array.to_list
-  |> List.mapi (fun i file ->
-         let line =
-           if i = cursor.pos && has_next then fmt_selected_name file
-           else fmt_name file
-         in
-         let base_style =
-           if is_file_chosen then Style.chosen
-           else if is_ignored file then Style.gitignored
-           else if i = cursor.pos then Style.selected
-           else Style.none
-         in
-         fmt base_style line)
-  |> Extra.List.in_between ~sep:(fmt Style.none mid)
-  |> fun lines ->
-  [ fmt Style.none top ] @ lines @ [ fmt Style.none bot ]
-  |> vertical *)
-
 let children_to_doc ~prev_total ~pos children =
   let open Pretty.Doc in
   let max_name_len = max_file_name_len children in
