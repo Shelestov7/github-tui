@@ -24,6 +24,7 @@ type t = {
   code_tab : code_tab;
   issues_tab : Issue.t;
   pull_requests_tab : Pr.t;
+  no_nerd_font : bool;
 }
 
 type initial_data = {
@@ -34,18 +35,29 @@ type initial_data = {
   width : int;
   height : int;
   show_gitignored : bool;
+  no_nerd_font : bool;
 }
 
 let initial_model
-    { owner; repo; root_dir_path; show_gitignored; files; width; height } =
+    {
+      owner;
+      repo;
+      root_dir_path;
+      files;
+      width;
+      height;
+      show_gitignored;
+      no_nerd_font;
+    } =
+  let icons = Pretty.Icon.get_icons no_nerd_font in
   {
     width;
     height;
     owner;
     repo;
     current_tab = Code;
-    code_tab =
-      { root_dir_path; fs = Fs.zip_it ~show_ignored:show_gitignored files };
-    issues_tab = Issue.make ~owner ~repo;
+    code_tab = { root_dir_path; fs = Fs.zip_it ~show_ignored:show_gitignored files };
+    issues_tab = Issue.make ~owner ~repo icons;
     pull_requests_tab = Pr.make ~owner ~repo;
+    no_nerd_font;
   }

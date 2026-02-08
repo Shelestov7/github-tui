@@ -10,12 +10,12 @@ let scroll ~lines ~span ~offset =
 let parents_path parents =
   List.fold_left (fun acc cur -> Filename.concat acc cur) "" (List.rev parents)
 
-let pwd root_dir_path (fs : Fs.zipper) =
+let pwd root_dir_path (fs : Fs.zipper) (icons : Pretty.Icon.t) =
   let parents = Fs.zipper_parents fs in
   let pwd_path = parents_path parents in
   let root_dir_name = Filename.basename root_dir_path in
   let full_path =
-    Pretty.Icon.pwd_char ^ " " ^ Filename.concat root_dir_name pwd_path
+    icons.pwd_char ^ " " ^ Filename.concat root_dir_name pwd_path
   in
   Pretty.Doc.(fmt Style.directory full_path)
 
@@ -59,19 +59,20 @@ let filter_children ~show_ignored children =
     |> List.filter (fun child -> not (file_is_ignored child))
     |> Array.of_list
 
-let fmt_file ~max_name_len (tree : Fs.tree) =
+let fmt_file ~max_name_len (tree : Fs.tree) (icons : Pretty.Icon.t) =
   let pad = Extra.String.fill_right max_name_len in
   match tree with
   | File { name; file_type; _ } -> (
       match Lazy.force file_type with
-      | Fs.Filec.Text -> Pretty.Icon.file_char ^ " " ^ pad name
-      | Fs.Filec.Binary -> Pretty.Icon.bin_char ^ " " ^ pad name)
+      | Fs.Filec.Text -> icons.file_char ^ " " ^ pad name
+      | Fs.Filec.Binary -> icons.bin_char ^ " " ^ pad name)
   | Dir { name; children = (lazy children); _ } -> (
       match children with
-      | [||] -> Pretty.Icon.empty_dir_char ^ " " ^ pad name
-      | _ -> Pretty.Icon.dir_char ^ " " ^ pad name)
+      | [||] -> icons.empty_dir_char ^ " " ^ pad name
+      | _ -> icons.dir_char ^ " " ^ pad name)
 
-let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen =
+let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen
+    icons =
   let open Pretty.Doc in
   let max_name_len = max_file_name_len cursor.files in
   let max_len = max_name_len + file_name_padding in
@@ -82,8 +83,10 @@ let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen =
   let bot = "╰" ^ Extra.String.repeat_txt (max_len - 2) "─" ^ "╯" in
 
   (* Line *)
-  let fmt_selected_name file = "│ " ^ fmt_file ~max_name_len file ^ " ├" in
-  let fmt_name file = "│ " ^ fmt_file ~max_name_len file ^ " │" in
+  let fmt_selected_name file =
+    "│ " ^ fmt_file ~max_name_len file icons ^ " ├"
+  in
+  let fmt_name file = "│ " ^ fmt_file ~max_name_len file icons ^ " │" in
   let hi_pos = (2 * cursor.pos) + 1 in
 
   let style = if is_file_chosen then Style.chosen else Style.selected in
@@ -101,7 +104,7 @@ let current_level_to_doc (cursor : Fs.dir_cursor) ~has_next ~is_file_chosen =
          else str s)
   |> vertical
 
-let children_to_doc ~prev_total ~pos children =
+let children_to_doc ~prev_total ~pos children icons =
   let open Pretty.Doc in
   let max_name_len = max_file_name_len children in
   let max_len = max_name_len + file_name_padding in
@@ -122,7 +125,7 @@ let children_to_doc ~prev_total ~pos children =
   in
 
   (* Formatting single file name *)
-  let fmt_name i file =
+  let fmt_name i file icons =
     let is_first_pos = i = 0 in
     let is_last_pos = i = Array.length children - 1 in
     let has_more_than_one = Array.length children > 1 in
@@ -131,14 +134,14 @@ let children_to_doc ~prev_total ~pos children =
       else if is_last_pos then "└"
       else "├"
     in
-    prefix ^ "─┤ " ^ fmt_file ~max_name_len file ^ " │"
+    prefix ^ "─┤ " ^ fmt_file ~max_name_len file icons ^ " │"
   in
 
   (* Next level files *)
   let files_doc =
     children
     |> Array.to_list
-    |> List.mapi fmt_name
+    |> List.mapi (fun i f -> fmt_name i f icons)
     |> Extra.List.in_between ~sep:mid
     |> (fun lines -> [ top ] @ lines @ [ bot ])
     |> (fun lines ->
@@ -167,7 +170,7 @@ type selected_node =
       children : Fs.tree array;
     }
 
-let next_level_to_doc selected_node =
+let next_level_to_doc selected_node icons =
   (* Get the next level files *)
   match selected_node with
   | File_selected file_contents ->
@@ -177,7 +180,8 @@ let next_level_to_doc selected_node =
       (* No children of a directory without children *)
       | [||] -> Empty_directory
       (* Non-empty array of children *)
-      | _ -> Directory_contents (children_to_doc ~prev_total ~pos children))
+      | _ ->
+          Directory_contents (children_to_doc ~prev_total ~pos children icons))
 
 type fs_view = {
   left : Fs.dir_cursor;
@@ -219,22 +223,22 @@ let fs_to_view (fs : Fs.zipper) =
 
   { left; right; is_file_chosen }
 
-let file_view (fs : Fs.zipper) =
+let file_view (fs : Fs.zipper) icons =
   let view = fs_to_view fs in
 
-  let next_level_doc = next_level_to_doc view.right in
+  let next_level_doc = next_level_to_doc view.right icons in
 
   let current_level_doc =
     current_level_to_doc view.left
       ~has_next:(is_directory_contents next_level_doc)
-      ~is_file_chosen:view.is_file_chosen
+      ~is_file_chosen:view.is_file_chosen icons
   in
   match next_level_doc with
   | Empty_directory -> current_level_doc
   | Directory_contents next_level_doc | File_contents next_level_doc ->
       Pretty.Doc.horizontal [ current_level_doc; next_level_doc ]
 
-let section (code_tab : Model.code_tab) =
-  let current_path_doc = pwd code_tab.root_dir_path code_tab.fs in
-  let fs_doc = file_view code_tab.fs in
+let section (code_tab : Model.code_tab) icons =
+  let current_path_doc = pwd code_tab.root_dir_path code_tab.fs icons in
+  let fs_doc = file_view code_tab.fs icons in
   Pretty.Doc.vertical [ current_path_doc; fs_doc ]

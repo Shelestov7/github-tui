@@ -72,6 +72,7 @@ type t = {
   log_file : string option;
   ignore_size_warning : bool;
   show_gitignored : bool;
+  no_nerd_font : bool;
 }
 
 let init
@@ -81,10 +82,20 @@ let init
       ignore_size_warning;
       log_file = _;
       show_gitignored;
+      no_nerd_font;
     }
     : Model.initial_data =
   let ({ owner; repo } as owner_repo) = parse_owner_repo owner_repo in
   let root_dir_path = clone_repo ~owner_repo ~local_path in
   let files = Lazy.force (read_root_tree ~root_dir_path) in
   let { height; width } = get_terminal_dimensions ignore_size_warning in
-  { owner; repo; root_dir_path; show_gitignored; files; width; height }
+  {
+    owner;
+    repo;
+    root_dir_path;
+    show_gitignored;
+    files;
+    width;
+    height;
+    no_nerd_font;
+  }

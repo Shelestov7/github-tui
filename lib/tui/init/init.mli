@@ -4,6 +4,7 @@ type t = {
   log_file : string option;
   ignore_size_warning : bool;
   show_gitignored : bool;
+  no_nerd_font : bool;
 }
 
 val init : t -> Model.initial_data

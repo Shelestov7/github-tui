@@ -24,9 +24,14 @@ let ignore_size_warning_arg =
 
 let no_gitignore_arg =
   let doc = "Show gitignored files in file tree." in
-  Arg.(value & flag & info [ "n"; "no-gitignore" ] ~doc)
+  Arg.(value & flag & info [ "no-gitignore" ] ~doc)
 
-let run owner_repo local_path log_file ignore_size_warning no_gitignore =
+let no_nerd_font_arg =
+  let doc = "Don't try to use Nerd Font Icons." in
+  Arg.(value & flag & info [ "n"; "no-nerd-font" ] ~doc)
+
+let run owner_repo local_path log_file ignore_size_warning no_gitignore
+    no_nerd_font =
   Tui.start
     {
       owner_repo;
@@ -34,6 +39,7 @@ let run owner_repo local_path log_file ignore_size_warning no_gitignore =
       log_file;
       ignore_size_warning;
       show_gitignored = no_gitignore;
+      no_nerd_font;
     }
 
 let gh_tui_term =
@@ -43,7 +49,8 @@ let gh_tui_term =
     $ path_arg
     $ log_arg
     $ ignore_size_warning_arg
-    $ no_gitignore_arg)
+    $ no_gitignore_arg
+    $ no_nerd_font_arg)
 
 let cmd =
   let doc = "TUI of a GitHub repository" in
